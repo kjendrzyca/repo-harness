@@ -14,6 +14,10 @@ Inside that folder:
 - `references/` contains bundled reference material used by the skill.
 - `assets/` contains copyable templates and resources used by the skill.
 
+The ExecPlan template in `skills/repo-harness/assets/exec-plans/create-plan-file.md` is based on OpenAI's execution plans guidance:
+
+- https://developers.openai.com/cookbook/articles/codex_exec_plans
+
 ## What the skill can do
 
 The skill is not bootstrap-only.
