@@ -1,0 +1,625 @@
+# ============================================================
+# Codex Code Review — Lightweight, self-contained PR review bot
+#
+# Features:
+#   - Incremental reviews (only new commits since last review)
+#   - Stale comment management (collapses previous reviews)
+#   - State continuity across reviews (tracks open/resolved issues)
+#   - /codex-review command (full, reset, --since <sha>)
+#   - Review passes (`Codex Review Pass 1`, `Pass 2`, ...)
+#   - Repo guidelines support (AGENTS.md, REVIEW_GUIDELINES.md)
+#
+# Setup:
+#   1. Copy .github/workflows/codex-review.yml and
+#      .github/scripts/codex-review/ to your repo
+#   2. Authenticate Codex and set the secret:
+#      codex login
+#      gh secret set CODEX_AUTH_JSON_B64 \
+#        --body "$(cat ~/.codex/auth.json | base64 | tr -d '\n')"
+#      See https://developers.openai.com/codex/auth#credential-storage
+#      for where auth.json is stored on your platform.
+#   3. Customize paths and model below
+#
+# Security:
+#   - Uses pull_request_target for secret access (only same-repo PRs)
+#   - GITHUB_TOKEN is NOT passed to Codex
+#   - Checkout uses the PR head SHA directly, with persist-credentials: false
+#   - Codex runs in workspace-write sandbox (default) with network disabled
+#   - Dirty-tree check fails the job if Codex modifies tracked files
+#   - AppArmor workaround for Ubuntu 24.04 matches openai/codex-action@v1
+#   - Sandbox gate hard-fails if bwrap can't create user namespaces
+# ============================================================
+name: Codex Code Review
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review, synchronize]
+    # ── Customize: paths that trigger auto-review ──
+    # Remove this block to review all changes.
+    # paths:
+    #   - 'src/**'
+    #   - 'lib/**'
+    #   - 'packages/**'
+
+  issue_comment:
+    types: [created]
+
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: number
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    # One review at a time per PR. New pushes cancel the in-progress review.
+    # The next review will cover all changes since the last COMPLETED review.
+    # Set cancel-in-progress: false if you prefer queuing over cancellation.
+    concurrency:
+      group: >-
+        codex-review-${{
+          github.event.pull_request.number
+          || (github.event.issue.pull_request && github.event.issue.number)
+          || github.event.inputs.pr_number
+          || github.run_id
+        }}
+      cancel-in-progress: true
+
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       (github.event.comment.body == '/codex-review' ||
+        startsWith(github.event.comment.body, '/codex-review ')) &&
+       (github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'COLLABORATOR'))
+
+    permissions:
+      contents: write  # Needed for GraphQL resolveReviewThread mutation
+      pull-requests: write
+      checks: write
+      issues: write
+
+    env:
+      # ── Customize: model, sandbox, and reasoning ──
+      CODEX_MODEL: gpt-5.5
+      CODEX_REASONING: xhigh
+      CODEX_SANDBOX_MODE: workspace-write    # workspace-write | read-only
+      CODEX_WEB_SEARCH_MODE: disabled        # disabled | cached | live
+
+    steps:
+      # ── PR Context ───────────────────────────────────────────
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER_INPUT: ${{ github.event.inputs.pr_number }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const prNumber = context.payload.pull_request?.number
+              || context.issue?.number
+              || parseInt(process.env.PR_NUMBER_INPUT, 10);
+
+            if (!prNumber || isNaN(prNumber)) {
+              core.setFailed('Could not determine PR number');
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: prNumber,
+            });
+
+            core.setOutput('number', pr.number);
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('base_sha', pr.base.sha);
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('base_ref', pr.base.ref);
+            core.setOutput('title', pr.title);
+            core.setOutput('author_login', pr.user?.login || '');
+            core.setOutput('author_type', pr.user?.type || '');
+
+            // Write PR body to file (avoids output escaping issues)
+            const fs = require('fs');
+            fs.writeFileSync('/tmp/pr-body.txt', pr.body || '(no description)');
+
+            // Parse /codex-review command options (inline — runs before checkout)
+            let forceFullReview = false;
+            let resetState = false;
+            let sinceSha = '';
+            if (context.eventName === 'issue_comment') {
+              const tokens = (context.payload.comment?.body || '').trim().split(/\s+/).slice(1);
+              for (let i = 0; i < tokens.length; i++) {
+                const t = tokens[i];
+                if (['full', '--full', 'all', '--all'].includes(t)) forceFullReview = true;
+                else if (['reset', '--reset'].includes(t)) resetState = true;
+                else if (t === '--since' && /^[0-9a-f]{7,40}$/i.test(tokens[i+1] || '')) sinceSha = tokens[++i];
+                else { const m = t.match(/^--since=([0-9a-f]{7,40})$/i); if (m) sinceSha = m[1]; }
+              }
+            }
+            core.setOutput('force_full_review', String(forceFullReview));
+            core.setOutput('reset_state', String(resetState));
+            core.setOutput('since_sha', sinceSha);
+
+            console.log(`PR #${pr.number}: ${pr.title}`);
+            console.log(`Head: ${pr.head.sha.slice(0, 8)} (${pr.head.ref})`);
+            console.log(`Base: ${pr.base.sha.slice(0, 8)} (${pr.base.ref})`);
+
+      - name: Check skip conditions
+        id: skip
+        env:
+          PR_AUTHOR_LOGIN: ${{ steps.pr.outputs.author_login }}
+          PR_AUTHOR_TYPE: ${{ steps.pr.outputs.author_type }}
+        run: |
+          LOGIN="${PR_AUTHOR_LOGIN:-}"
+          TYPE="${PR_AUTHOR_TYPE:-}"
+          SKIP="false"
+          REASON=""
+
+          if [[ "$TYPE" == "Bot" ]] || [[ "$LOGIN" == *"[bot]" ]]; then
+            SKIP="true"
+            REASON="Bot PR ($LOGIN)"
+          fi
+
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+          if [ "$SKIP" = "true" ]; then
+            echo "Skipping: $REASON"
+          fi
+
+      - name: React to command
+        if: github.event_name == 'issue_comment' && steps.skip.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              ...context.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      # ── Check Run ────────────────────────────────────────────
+      - name: Create pending check
+        id: check
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const check = await github.rest.checks.create({
+              ...context.repo,
+              name: 'Codex Review Result',
+              head_sha: '${{ steps.pr.outputs.head_sha }}',
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+              output: {
+                title: 'Codex is reviewing your PR...',
+                summary: 'The AI review is in progress. Check the Actions tab for live logs.',
+              },
+            });
+            core.setOutput('check_id', check.data.id);
+
+      # ── Code Checkout ────────────────────────────────────────
+      # First checkout main to get the latest review scripts, then checkout PR code.
+      # This ensures the scripts match the workflow version, not the PR branch.
+      - name: Checkout review scripts from main
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts/codex-review
+          path: __review-scripts
+
+      - name: Copy review scripts to /tmp
+        if: steps.skip.outputs.skip != 'true'
+        run: cp -r __review-scripts/.github/scripts/codex-review /tmp/codex-review-scripts
+
+      - name: Checkout PR
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch base for diff
+        if: steps.skip.outputs.skip != 'true'
+        run: git fetch --no-tags origin ${{ steps.pr.outputs.base_sha }}
+
+      # ── State & Scope ────────────────────────────────────────
+      - name: Load previous state
+        id: state
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const {
+              loadPreviousState,
+              summarizePreviousState,
+            } = require('/tmp/codex-review-scripts/index.cjs');
+
+            // Create .codex-ci/ directory for review artifacts
+            fs.mkdirSync('.codex-ci', { recursive: true });
+
+            const reset = '${{ steps.pr.outputs.reset_state }}' === 'true';
+            const prev = await loadPreviousState({
+              github,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              prNumber: ${{ steps.pr.outputs.number }},
+              reset,
+            });
+
+            // Write state files into workspace so Codex can read them
+            fs.writeFileSync(
+              '.codex-ci/state-prev.json',
+              prev.state ? JSON.stringify(prev.state, null, 2) : ''
+            );
+            fs.writeFileSync(
+              '.codex-ci/review-prev.md',
+              prev.previousReviewBody || ''
+            );
+
+            // Write previous state for the post-processing step.
+            // Include the full state so postResults can access inlineCommentMap.
+            const summary = summarizePreviousState(prev);
+            summary.state = prev.state;
+            fs.writeFileSync(
+              '/tmp/previous-state.json',
+              JSON.stringify(summary)
+            );
+
+            core.setOutput('last_reviewed_sha', prev.lastReviewedSha || '');
+            core.setOutput('review_count', String(prev.reviewCount));
+
+      - name: Determine review scope
+        id: scope
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          LAST_REVIEWED_SHA: ${{ steps.state.outputs.last_reviewed_sha }}
+          FORCE_FULL_REVIEW: ${{ steps.pr.outputs.force_full_review }}
+          RESET_STATE: ${{ steps.pr.outputs.reset_state }}
+          SINCE_SHA: ${{ steps.pr.outputs.since_sha }}
+        run: |
+          set -euo pipefail
+
+          MERGE_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+
+          # Determine the "since" SHA: explicit --since > last reviewed > none
+          SINCE="${SINCE_SHA:-${LAST_REVIEWED_SHA:-}}"
+          REASON="no_previous_review"
+          MODE="full"
+          DIFF_BASE="$MERGE_BASE_SHA"
+
+          if [ "${RESET_STATE:-false}" = "true" ]; then
+            REASON="reset_requested"
+          elif [ "${FORCE_FULL_REVIEW:-false}" = "true" ]; then
+            REASON="forced_full_review"
+          elif [ -n "$SINCE" ]; then
+            if git cat-file -e "${SINCE}^{commit}" 2>/dev/null; then
+              if git merge-base --is-ancestor "$SINCE" "$HEAD_SHA"; then
+                COUNT="$(git rev-list --count "$SINCE".."$HEAD_SHA")"
+                if [ "$COUNT" -eq 0 ]; then
+                  MODE="skip"
+                  REASON="no_new_commits"
+                else
+                  MODE="incremental"
+                  DIFF_BASE="$SINCE"
+                  REASON="${SINCE_SHA:+since_requested_sha}"
+                  REASON="${REASON:-since_last_review}"
+                fi
+              else
+                REASON="history_rewritten"
+              fi
+            else
+              REASON="previous_sha_missing"
+            fi
+          fi
+
+          COMMIT_COUNT="$(git rev-list --count "$DIFF_BASE".."$HEAD_SHA" 2>/dev/null || echo 0)"
+          if [ "$MODE" != "skip" ]; then
+            COMMIT_RANGE="${DIFF_BASE:0:8}..${HEAD_SHA:0:8}"
+          else
+            COMMIT_RANGE=""
+          fi
+
+          echo "review_mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "review_scope_reason=$REASON" >> "$GITHUB_OUTPUT"
+          echo "merge_base_sha=$MERGE_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "diff_base_sha=$DIFF_BASE" >> "$GITHUB_OUTPUT"
+          echo "commit_range=$COMMIT_RANGE" >> "$GITHUB_OUTPUT"
+          echo "commit_count=$COMMIT_COUNT" >> "$GITHUB_OUTPUT"
+
+          echo "Scope: mode=$MODE reason=$REASON commits=$COMMIT_COUNT range=$COMMIT_RANGE"
+
+      # ── Diff Generation ──────────────────────────────────────
+      - name: Generate diff
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        env:
+          DIFF_BASE_SHA: ${{ steps.scope.outputs.diff_base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          MERGE_BASE_SHA: ${{ steps.scope.outputs.merge_base_sha }}
+          REVIEW_MODE: ${{ steps.scope.outputs.review_mode }}
+        run: |
+          mkdir -p .codex-ci
+
+          # Scoped diff (what the model reviews)
+          git diff "$DIFF_BASE_SHA" "$HEAD_SHA" > .codex-ci/pr-diff.patch
+          git diff --name-only "$DIFF_BASE_SHA" "$HEAD_SHA" > .codex-ci/changed-files.txt
+
+          # Full PR diff (for cross-commit context in incremental mode)
+          if [ "$REVIEW_MODE" = "incremental" ]; then
+            git diff "$MERGE_BASE_SHA" "$HEAD_SHA" > .codex-ci/pr-diff-full.patch
+            git diff --name-only "$MERGE_BASE_SHA" "$HEAD_SHA" > .codex-ci/changed-files-full.txt
+          else
+            cp .codex-ci/pr-diff.patch .codex-ci/pr-diff-full.patch
+            cp .codex-ci/changed-files.txt .codex-ci/changed-files-full.txt
+          fi
+
+          # Commit list (most recent first)
+          git log --oneline "$DIFF_BASE_SHA".."$HEAD_SHA" > .codex-ci/review-commits.txt
+
+          echo "Changed files (scoped):"
+          cat .codex-ci/changed-files.txt
+          echo ""
+          echo "Commits in scope:"
+          cat .codex-ci/review-commits.txt
+
+      # ── Codex Setup & Execution ──────────────────────────────
+      - name: Setup Node.js
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Codex CLI
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        run: npm install -g @openai/codex
+
+      - name: Restore Codex auth
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        env:
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+        run: |
+          if [ -z "${CODEX_AUTH_JSON_B64:-}" ]; then
+            echo "::error::CODEX_AUTH_JSON_B64 secret is not set. Run: codex login && gh secret set CODEX_AUTH_JSON_B64 --body \"\$(cat ~/.codex/auth.json | base64 | tr -d '\\n')\""
+            exit 1
+          fi
+          mkdir -p "$HOME/.codex"
+          echo "$CODEX_AUTH_JSON_B64" | base64 -d > "$HOME/.codex/auth.json"
+          chmod 600 "$HOME/.codex/auth.json"
+
+      - name: Enable Codex sandbox (GitHub-hosted runner workaround)
+        # Ubuntu 24.04+ blocks unprivileged user namespaces via AppArmor,
+        # which prevents Codex's bubblewrap sandbox from creating network
+        # namespaces (bwrap: loopback: Failed RTM_NEWADDR).
+        # This matches the fix in openai/codex-action@v1 (action.yml:262-286).
+        # Acceptable on ephemeral GitHub-hosted runners. Self-hosted runners
+        # need equivalent kernel support configured ahead of time.
+        if: runner.os == 'Linux' && steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        run: |
+          current="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)"
+          if [ -n "$current" ] && [ "$current" != "0" ]; then
+            echo "Disabling kernel.apparmor_restrict_unprivileged_userns for bubblewrap."
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          current_clone="$(sysctl -n kernel.unprivileged_userns_clone 2>/dev/null || true)"
+          if [ -n "$current_clone" ] && [ "$current_clone" != "1" ]; then
+            echo "Enabling kernel.unprivileged_userns_clone for bubblewrap."
+            sudo sysctl -w kernel.unprivileged_userns_clone=1
+          fi
+
+      - name: Verify Codex sandbox
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        run: |
+          if ! codex sandbox linux /bin/true 2>&1; then
+            echo "::error::Codex sandbox probe failed — bwrap cannot create user namespaces. See https://github.com/openai/codex/issues/12572"
+            exit 1
+          fi
+          echo "Sandbox probe passed"
+
+      - name: Build review prompt
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_TITLE: ${{ steps.pr.outputs.title }}
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          REVIEW_MODE: ${{ steps.scope.outputs.review_mode }}
+          REVIEW_SCOPE_REASON: ${{ steps.scope.outputs.review_scope_reason }}
+          COMMIT_RANGE: ${{ steps.scope.outputs.commit_range }}
+          COMMIT_COUNT: ${{ steps.scope.outputs.commit_count }}
+          DIFF_BASE_SHA: ${{ steps.scope.outputs.diff_base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          MERGE_BASE_SHA: ${{ steps.scope.outputs.merge_base_sha }}
+          REVIEW_COUNT: ${{ steps.state.outputs.review_count }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { buildPrompt, loadGuidelines } = require('/tmp/codex-review-scripts/index.cjs');
+
+            const prBody = fs.readFileSync('/tmp/pr-body.txt', 'utf8');
+            const guidelines = loadGuidelines(process.cwd());
+            const reviewNumber = parseInt(process.env.REVIEW_COUNT || '0', 10) + 1;
+
+            const prompt = buildPrompt({
+              PR_NUMBER: process.env.PR_NUMBER,
+              PR_TITLE: process.env.PR_TITLE,
+              PR_BODY: prBody,
+              BASE_REF: process.env.BASE_REF,
+              HEAD_REF: process.env.HEAD_REF,
+              REVIEW_MODE: process.env.REVIEW_MODE,
+              REVIEW_SCOPE_REASON: process.env.REVIEW_SCOPE_REASON,
+              COMMIT_RANGE: process.env.COMMIT_RANGE,
+              COMMIT_COUNT: process.env.COMMIT_COUNT,
+              DIFF_BASE_SHA: process.env.DIFF_BASE_SHA,
+              HEAD_SHA: process.env.HEAD_SHA,
+              MERGE_BASE_SHA: process.env.MERGE_BASE_SHA,
+              REVIEW_NUMBER: reviewNumber,
+              GUIDELINES_SECTION: guidelines,
+            });
+
+            fs.mkdirSync('.codex-ci', { recursive: true });
+            fs.writeFileSync('.codex-ci/review-prompt.md', prompt);
+
+            // Copy output schema into workspace
+            const schemaPath = '/tmp/codex-review-scripts/output-schema.json';
+            if (fs.existsSync(schemaPath)) {
+              fs.copyFileSync(schemaPath, '.codex-ci/output-schema.json');
+            } else {
+              // Fallback: write schema inline if not on checkout branch
+              const schema = {"type":"object","properties":{"review_markdown":{"type":"string"},"inline_comments":{"type":"array","items":{"type":"object","properties":{"issue_id":{"type":"string"},"file":{"type":"string"},"line":{"type":"integer"},"start_line":{"type":["integer","null"]},"title":{"type":"string"},"body":{"type":"string"},"category":{"type":"string"},"suggestion":{"type":["string","null"]}},"required":["issue_id","file","line","start_line","title","body","category","suggestion"],"additionalProperties":false}},"state":{"type":"object","properties":{"schema_version":{"type":"integer"},"last_reviewed_head_sha":{"type":"string"},"review_count":{"type":"integer"},"updated_at":{"type":"string"},"open_issues":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"severity":{"type":"string","enum":["P0","P1","P2"]},"category":{"type":"string"},"title":{"type":"string"},"location":{"type":"string"},"status":{"type":"string"},"first_seen_head_sha":{"type":"string"},"last_seen_head_sha":{"type":"string"}},"required":["id","severity","title","location","status","category","first_seen_head_sha","last_seen_head_sha"],"additionalProperties":false}},"recently_resolved_issues":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"resolved_in_head_sha":{"type":"string"},"resolution":{"type":"string"}},"required":["id","resolved_in_head_sha","resolution"],"additionalProperties":false}}},"required":["schema_version","last_reviewed_head_sha","review_count","updated_at","open_issues","recently_resolved_issues"],"additionalProperties":false}},"required":["review_markdown","inline_comments","state"],"additionalProperties":false};
+              fs.writeFileSync('.codex-ci/output-schema.json', JSON.stringify(schema, null, 2));
+            }
+
+            console.log(`Prompt built (${prompt.length} chars, pass ${reviewNumber})`);
+
+      - name: Run Codex
+        id: codex
+        if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
+        run: |
+          echo "Model: $CODEX_MODEL | Sandbox: $CODEX_SANDBOX_MODE | Reasoning: $CODEX_REASONING"
+          START_TIME=$(date +%s)
+
+          if codex exec \
+            --ephemeral \
+            --skip-git-repo-check \
+            --model "$CODEX_MODEL" \
+            --sandbox "$CODEX_SANDBOX_MODE" \
+            -c "allow_login_shell=false" \
+            -c "web_search=\"$CODEX_WEB_SEARCH_MODE\"" \
+            -c "model_reasoning_effort=\"$CODEX_REASONING\"" \
+            -c "sandbox_workspace_write.network_access=false" \
+            --output-schema .codex-ci/output-schema.json \
+            -o .codex-ci/codex-review-output.json \
+            - < .codex-ci/review-prompt.md; then
+            EXIT_CODE=0
+          else
+            EXIT_CODE=$?
+          fi
+
+          DURATION=$(( $(date +%s) - START_TIME ))
+
+          if [ "$EXIT_CODE" -eq 0 ] && [ -s .codex-ci/codex-review-output.json ]; then
+            echo "review_generated=true" >> "$GITHUB_OUTPUT"
+            echo "Review completed in ${DURATION}s"
+            jq -r '.review_markdown' .codex-ci/codex-review-output.json | head -20
+          else
+            echo "review_generated=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Codex exited with code $EXIT_CODE or produced no output"
+          fi
+
+          echo "duration=$DURATION" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify checkout not modified
+        if: steps.codex.outputs.review_generated == 'true'
+        run: |
+          if ! git diff --quiet -- ':!.codex-ci' || ! git diff --cached --quiet -- ':!.codex-ci'; then
+            echo "::error::Codex modified tracked files during review"
+            git diff --stat -- ':!.codex-ci'
+            exit 1
+          fi
+
+      # ── Post-Processing ──────────────────────────────────────
+      - name: Post results
+        if: always() && steps.pr.outputs.number
+        uses: actions/github-script@v7
+        env:
+          CHECK_ID: ${{ steps.check.outputs.check_id }}
+          SHOULD_SKIP: ${{ steps.skip.outputs.skip }}
+          SKIP_REASON: ${{ steps.skip.outputs.reason }}
+          REVIEW_MODE: ${{ steps.scope.outputs.review_mode }}
+          REVIEW_GENERATED: ${{ steps.codex.outputs.review_generated }}
+          JOB_STATUS: ${{ job.status }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const checkId = process.env.CHECK_ID ? Number(process.env.CHECK_ID) : null;
+
+            // ── Skip cases ──
+            if (process.env.SHOULD_SKIP === 'true') {
+              if (checkId) {
+                await github.rest.checks.update({
+                  owner, repo, check_run_id: checkId,
+                  status: 'completed', conclusion: 'neutral',
+                  output: { title: 'Review Skipped', summary: process.env.SKIP_REASON || 'Skipped' },
+                });
+              }
+              console.log(`Skipped: ${process.env.SKIP_REASON}`);
+              return;
+            }
+
+            if (process.env.REVIEW_MODE === 'skip') {
+              if (checkId) {
+                await github.rest.checks.update({
+                  owner, repo, check_run_id: checkId,
+                  status: 'completed', conclusion: 'success',
+                  output: { title: 'No New Commits', summary: 'All commits have already been reviewed.' },
+                });
+              }
+              console.log('No new commits to review');
+              return;
+            }
+
+            if (process.env.JOB_STATUS === 'cancelled') {
+              if (checkId) {
+                await github.rest.checks.update({
+                  owner, repo, check_run_id: checkId,
+                  status: 'completed', conclusion: 'cancelled',
+                  output: { title: 'Review Cancelled', summary: 'A newer review superseded this one.' },
+                });
+              }
+              return;
+            }
+
+            // ── Review completed — run post-processing pipeline ──
+            try {
+              const { postResults } = require('/tmp/codex-review-scripts/index.cjs');
+
+              let previousState = { stateCommentId: null, reviewCommentId: null, reviewCount: 0 };
+              try {
+                previousState = JSON.parse(fs.readFileSync('/tmp/previous-state.json', 'utf8'));
+              } catch { /* first review, no previous state */ }
+
+              await postResults({
+                github, owner, repo, prNumber, checkId,
+                headSha: process.env.HEAD_SHA,
+                previousState,
+                outputDir: '.codex-ci',
+              });
+            } catch (e) {
+              console.log(`Post-processing error: ${e.message}`);
+              // Ensure check completes even if post-processing fails
+              if (checkId) {
+                try {
+                  await github.rest.checks.update({
+                    owner, repo, check_run_id: checkId,
+                    status: 'completed', conclusion: 'failure',
+                    output: {
+                      title: 'Review Error',
+                      summary: `Post-processing failed: ${e.message}`,
+                    },
+                  });
+                } catch { /* best effort */ }
+              }
+            }

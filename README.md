@@ -18,6 +18,10 @@ The ExecPlan template in `skills/repo-harness/assets/exec-plans/create-plan-file
 
 - https://developers.openai.com/cookbook/articles/codex_exec_plans
 
+Additional copyable tools live in:
+
+- [`tools/codex-review/`](tools/codex-review/README.md) - GitHub Actions PR review bot powered by the Codex CLI.
+
 ## What the skill can do
 
 The skill is not bootstrap-only.
