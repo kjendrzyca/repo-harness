@@ -1,32 +1,25 @@
-# Harness
+# Repo Harness
 
-This repository packages a single reusable skill: `repo-harness`.
+A reusable [Agent Skill](https://agentskills.io) for initializing, auditing, updating, maintaining, and continuously checking repositories against a lightweight agent-first harness model. Inspired by OpenAI's ["Harness engineering: leveraging Codex in an agent-first world"](https://openai.com/index/harness-engineering/).
 
-The skill is designed to help agents and maintainers initialize, audit, update, maintain, and continuously check repositories against a lightweight agent-first documentation and harness model inspired by the OpenAI article ["Harness engineering: leveraging Codex in an agent-first world"](https://openai.com/index/harness-engineering/).
+Compatible with Claude, Codex, OpenCode, and other agents that support the Agent Skills spec.
 
-## What lives here
+## Installation
 
-The actual skill bundle is:
-- `skills/repo-harness/`
+```bash
+npx skills add github.com/kjendrzyca/repo-harness --skill repo-harness
+```
 
-Inside that folder:
-- `SKILL.md` is the operational interface.
-- `references/` contains bundled reference material used by the skill.
-- `assets/` contains copyable templates and resources used by the skill.
+Target a specific agent:
 
-The ExecPlan template in `skills/repo-harness/assets/exec-plans/create-plan-file.md` is based on OpenAI's execution plans guidance:
+```bash
+npx skills add github.com/kjendrzyca/repo-harness --skill repo-harness --agent opencode
+```
 
-- https://developers.openai.com/cookbook/articles/codex_exec_plans
+## What the skill does
 
-Additional copyable tools live in:
+The skill is not bootstrap-only. It supports the full lifecycle:
 
-- [`tools/codex-review/`](tools/codex-review/README.md) - GitHub Actions PR review bot powered by the Codex CLI.
-
-## What the skill can do
-
-The skill is not bootstrap-only.
-
-It supports the full lifecycle:
 - `init` - create the smallest useful local harness in a target repo.
 - `audit` - assess maturity and identify gaps.
 - `update` - apply one justified next-layer improvement.
@@ -35,39 +28,26 @@ It supports the full lifecycle:
 - `exec-plans` - install or refresh repo-local execution-plan support.
 - `check` - run a continuous conformance pass and suggest or apply the smallest useful cleanup.
 
-## How to use it
-
-Install or expose `skills/repo-harness/` as a local skill in your agent environment.
-
-- For OpenCode, copy it to `.opencode/skills/repo-harness/` or `.agents/skills/repo-harness/`.
-- For Claude Code, copy it to `.claude/skills/repo-harness/` or symlink `.agents/skills/repo-harness/`.
-- For Codex, copy it to `.agents/skills/repo-harness/`.
-
-Then ask the agent to use the skill for the intent you want. For tools that expose direct skill invocation, use the skill name `repo-harness`.
+Use it by asking the agent to invoke the skill:
 
 ```text
-/repo-harness <mode> [focus]
-```
-
-Examples:
-
-```text
-Use the `repo-harness` skill to initialize this repository.
-Use the `repo-harness` skill to audit whether this repository is still aligned.
-Use the `repo-harness` skill to update this repo by one justified next step.
-Use the `repo-harness` skill to decide whether this repo needs core beliefs yet.
+Use the `repo-harness` skill to audit this repository.
+Use the `repo-harness` skill to apply one justified next step.
 Use the `repo-harness` skill to install execution plans.
-Use the `repo-harness` skill to run a continuous conformance check.
 ```
 
-## Design choice
+The ExecPlan template in [`skills/repo-harness/assets/exec-plans/create-plan-file.md`](skills/repo-harness/assets/exec-plans/create-plan-file.md) is based on OpenAI's execution plans guidance:
 
-This repo is intentionally skill-centric.
+- https://developers.openai.com/cookbook/articles/codex_exec_plans
 
-There is no separate prompt interface here.
-The markdown files are bundled resources for the skill itself.
+## Extras
 
-That keeps the operational model in one place:
-- humans use the README to understand the package,
-- agents use the skill,
-- the skill reads its own bundled reference material and applies it to target repositories.
+- [`tools/codex-review/`](tools/codex-review/README.md) - GitHub Actions PR review bot powered by the Codex CLI. Not part of the skill bundle; copy it in if you want it.
+
+## Contributing
+
+See [AGENTS.md](./AGENTS.md).
+
+## License
+
+[MIT](./LICENSE)

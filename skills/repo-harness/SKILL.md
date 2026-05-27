@@ -1,7 +1,7 @@
 ---
 name: repo-harness
 description: Initialize, audit, update, maintain, and continuously check repositories against a lightweight agent-first harness approach. Use when a repo needs better local docs, core beliefs, execution plans, or cleanup of harness drift.
-compatibility: Designed for Agent Skills-compatible tools such as OpenCode, Claude Code, and Codex. Avoids tool-specific frontmatter and argument substitution.
+license: MIT
 ---
 
 # Repo Harness Skill

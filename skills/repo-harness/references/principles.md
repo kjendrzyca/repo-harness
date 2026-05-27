@@ -72,6 +72,8 @@ When reducing an oversized `AGENTS.md`, do not trim first and hope to reconstruc
 Practical rule of thumb:
 - if `AGENTS.md` goes beyond roughly 80-120 lines or mixes too many levels of detail, move deeper knowledge into `docs/` and turn `AGENTS.md` back into a map.
 
+Concrete trigger: when you keep wanting to add another detail to `AGENTS.md`, that itself is the signal to move the relevant body of detail to `docs/` and keep `AGENTS.md` as a map.
+
 ### 2.4 Use progressive disclosure
 
 Agents do better with:
@@ -148,6 +150,8 @@ Do not add these too early unless the repo has clearly earned them:
 - quality scorecards no one will maintain,
 - observability stacks before basic tests and logs are useful,
 - browser automation before the repo even has simple smoke checks.
+
+Conversely, a clear signal that the repo has earned execution plans: a meaningful change no longer fits comfortably in one clean prompt. Until that happens, plans are overhead.
 
 ## 3. Maturity model
 
