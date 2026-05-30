@@ -385,8 +385,9 @@ jobs:
           node-version: '22'
 
       - name: Install Codex CLI
+        # Pinned: unpinned `latest` once shipped a `codex sandbox` CLI change that broke the probe below.
         if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
-        run: npm install -g @openai/codex
+        run: npm install -g @openai/codex@0.135.0
 
       - name: Restore Codex auth
         if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
@@ -424,7 +425,7 @@ jobs:
       - name: Verify Codex sandbox
         if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
         run: |
-          if ! codex sandbox linux /bin/true 2>&1; then
+          if ! codex sandbox -- /bin/true 2>&1; then
             echo "::error::Codex sandbox probe failed — bwrap cannot create user namespaces. See https://github.com/openai/codex/issues/12572"
             exit 1
           fi
