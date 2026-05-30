@@ -9,16 +9,13 @@
 #   - Review passes (`Codex Review Pass 1`, `Pass 2`, ...)
 #   - Repo guidelines support (AGENTS.md, REVIEW_GUIDELINES.md)
 #
-# Setup:
-#   1. Copy .github/workflows/codex-review.yml and
-#      .github/scripts/codex-review/ to your repo
-#   2. Authenticate Codex and set the secret:
-#      codex login
-#      gh secret set CODEX_AUTH_JSON_B64 \
-#        --body "$(cat ~/.codex/auth.json | base64 | tr -d '\n')"
-#      See https://developers.openai.com/codex/auth#credential-storage
-#      for where auth.json is stored on your platform.
-#   3. Customize paths and model below
+# Setup: use the `codex-review` skill (github.com/kjendrzyca/repo-harness) to install this bundle
+#   and authenticate Codex with a dedicated login:
+#     npx skills add github.com/kjendrzyca/repo-harness --skill codex-review
+#   then have your agent "install and authenticate codex-review on this repo".
+#   Manual: copy this workflow + .github/scripts/codex-review/ to your repo's default branch,
+#   then set CODEX_AUTH_JSON_B64 to a base64-encoded Codex auth.json
+#   (see https://developers.openai.com/codex/auth#credential-storage). Customize paths/model below.
 #
 # Security:
 #   - Uses pull_request_target for secret access (only same-repo PRs)

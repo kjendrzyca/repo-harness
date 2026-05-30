@@ -8,6 +8,16 @@ Within each date, every change should get its own `### <Change title>` section. 
 
 ## 2026-05-30
 
+### Add codex-review Skill; Consolidate the Bot Into It
+
+- Add `skills/codex-review/`, a skill that installs, authenticates, and rotates the Codex PR-review
+  bot on a repo: installs the bundle, provisions a dedicated isolated Codex login (its own
+  `CODEX_HOME`/`auth.json`, separate from `~/.codex`), and sets the `CODEX_AUTH_JSON_B64` secret.
+- Move the bot bundle from `tools/codex-review/` into the skill at
+  `skills/codex-review/assets/bundle/` and remove the standalone `tools/codex-review/` directory.
+  The installed layout in target repos is unchanged (`.github/workflows/codex-review.yml` +
+  `.github/scripts/codex-review/`), so the workflow needs no path changes.
+
 ### Fix Codex Review Sandbox Probe and Pin Codex CLI
 
 - Pin `@openai/codex@0.135.0` in the review bot's "Install Codex CLI" step. The unpinned `latest` shipped a `codex sandbox` CLI change that silently broke the sandbox probe.

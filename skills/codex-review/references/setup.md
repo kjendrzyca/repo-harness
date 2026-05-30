@@ -1,8 +1,9 @@
-# Codex Review Bot
+# Codex Review Bot — reference
 
-This directory contains a copyable GitHub Actions review bot powered by the Codex CLI.
-
-It is designed as a lightweight PR review workflow that can be installed into a repository without adopting the rest of the `repo-harness` skill.
+Background and configuration for the GitHub Actions review bot that the `codex-review` skill
+installs and authenticates. The bot is a lightweight PR review workflow powered by the Codex CLI;
+the skill (see `../SKILL.md`) drives install, auth, and rotation, so this file is reference material:
+what the workflow does, how to configure it, cost control, and security.
 
 ## What It Does
 
@@ -14,9 +15,9 @@ It is designed as a lightweight PR review workflow that can be installed into a 
 - Reads repo-local guidance from `AGENTS.md` and `REVIEW_GUIDELINES.md`.
 - Can post both summary comments and inline review comments.
 
-## Files
+## Bundled files
 
-Copy these files into the target repository:
+The skill carries the bot under `assets/bundle/.github/`, in the same layout it takes in a target repo:
 
 ```text
 .github/workflows/codex-review.yml
@@ -25,23 +26,20 @@ Copy these files into the target repository:
 .github/scripts/codex-review/output-schema.json
 ```
 
-The files are stored here under the same `.github/` layout so they can be copied directly.
-
 ## Installation
 
-1. Copy the bundled `.github/` directory into the target repository.
+The skill performs these steps (see `../SKILL.md`); paths below are relative to the skill root:
 
-2. Authenticate Codex locally and create the GitHub Actions secret:
+1. **Install the bundle:** `scripts/install-workflow.sh --repo-dir <target>` copies the `.github/`
+   files above into the target repo. Commit them to the repo's **default branch** —
+   `pull_request_target` reads the workflow and scripts from the base branch, so it only takes effect
+   once committed there.
 
-   ```bash
-   codex login
-   gh secret set CODEX_AUTH_JSON_B64 \
-     --body "$(cat ~/.codex/auth.json | base64 | tr -d '\n')"
-   ```
-
-   See OpenAI's Codex auth documentation for the current `auth.json` location on your platform:
-
-   https://developers.openai.com/codex/auth#credential-storage
+2. **Authenticate:** a dedicated, isolated Codex login is provisioned in its own `CODEX_HOME`
+   (not `~/.codex`) and stored as the `CODEX_AUTH_JSON_B64` secret, via `scripts/identity.sh` then
+   `scripts/set-review-secret.sh --repo <OWNER/REPO>`. Keeping a separate login means the CI
+   credential can be rotated or revoked without touching your everyday session. See OpenAI's Codex
+   auth docs for `auth.json` details: https://developers.openai.com/codex/auth#credential-storage
 
 3. Review the workflow defaults in `.github/workflows/codex-review.yml`:
 
