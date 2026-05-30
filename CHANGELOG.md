@@ -6,6 +6,13 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-05-30
+
+### Fix Codex Review Sandbox Probe and Pin Codex CLI
+
+- Pin `@openai/codex@0.135.0` in the review bot's "Install Codex CLI" step. The unpinned `latest` shipped a `codex sandbox` CLI change that silently broke the sandbox probe.
+- Update the probe from `codex sandbox linux /bin/true` to `codex sandbox -- /bin/true` to match the current CLI, which removed the `linux` positional (the old form tried to `execvp` a binary named `linux` and failed).
+
 ## 2026-05-28
 
 ### Clean Up SKILL.md Frontmatter
