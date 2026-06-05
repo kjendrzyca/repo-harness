@@ -19,6 +19,18 @@ The auth is deliberately a *separate* Codex login in its own `CODEX_HOME`
 (`~/.codex-review-auth/home`), not your everyday `~/.codex` — so the CI credential can be rotated or
 revoked without touching your interactive session.
 
+## Security posture
+
+This skill is for private repositories only. Do not install the bundled review bot in public
+repositories.
+
+The workflow restores a Codex `auth.json` credential inside GitHub Actions. Treat that credential as
+a password-equivalent automation secret. Private repositories reduce the attacker set, but they do
+not remove the need for trigger authorization, least-privilege workflow permissions, sandbox
+hardening, supply-chain pinning, and prompt/output sanitization.
+
+See `references/setup.md` before installing this bot in a sensitive repository.
+
 ## Pick the mode from the request
 
 - "set up / add codex-review on this repo" → **Install**, then **Authenticate**.

@@ -18,6 +18,7 @@
 #   (see https://developers.openai.com/codex/auth#credential-storage). Customize paths/model below.
 #
 # Security:
+#   - Intended for private repositories only; do not install this workflow in public repos
 #   - Uses pull_request_target for secret access (only same-repo PRs)
 #   - GITHUB_TOKEN is NOT passed to Codex
 #   - Checkout uses the PR head SHA directly, with persist-credentials: false

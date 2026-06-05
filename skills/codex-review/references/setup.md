@@ -5,6 +5,12 @@ installs and authenticates. The bot is a lightweight PR review workflow powered 
 the skill (see `../SKILL.md`) drives install, auth, and rotation, so this file is reference material:
 what the workflow does, how to configure it, cost control, and security.
 
+> [!WARNING]
+> This bot is intended for private repositories only. Do not install it in public repositories.
+> It restores a Codex `auth.json` credential inside GitHub Actions, so private-repo use still
+> requires explicit trigger authorization, least-privilege permissions, sandbox hardening,
+> supply-chain pinning, and prompt/output sanitization.
+
 ## What It Does
 
 - Reviews same-repo pull requests with Codex.

@@ -6,6 +6,12 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-06-05
+
+### Mark Codex Review as Private-Repo-Only
+
+- Mark `codex-review` as intended for private repositories only.
+
 ## 2026-05-30
 
 ### Add codex-review Skill; Consolidate the Bot Into It

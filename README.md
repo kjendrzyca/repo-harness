@@ -42,7 +42,9 @@ The ExecPlan template in [`skills/repo-harness/assets/exec-plans/create-plan-fil
 
 ## Extras
 
-- [`codex-review`](skills/codex-review/SKILL.md) - skill that installs, authenticates, and rotates the Codex CLI PR review bot on a repo. Install: `npx skills add github.com/kjendrzyca/repo-harness --skill codex-review`.
+- [`codex-review`](skills/codex-review/SKILL.md) - private-repository-only skill that installs,
+  authenticates, and rotates the Codex CLI PR review bot on a repo. Do not install it in public
+  repositories. Install: `npx skills add github.com/kjendrzyca/repo-harness --skill codex-review`.
 
 ## Contributing
 
