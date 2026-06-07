@@ -78,6 +78,7 @@ After the first setup, the target repo's own docs, checks, and conventions shoul
 - Do not create a large docs tree for optics.
 - Do not create repo-specific core beliefs from generic software advice.
 - Do not install execution plans too early.
+- Keep canonical docs free of references to completed execution plans. Plans may link to docs, but docs must not link to plans, so the docs stay stable as plans are created, completed, and archived.
 - Promote repeated human judgment downward over time: docs, then scripts/tests, then lints when warranted.
 - When the right action is "do nothing yet", say so explicitly.
 - When implementing an update, prefer exactly one justified next step unless the user explicitly asks for a broader sweep.
