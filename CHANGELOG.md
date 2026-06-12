@@ -6,6 +6,12 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-06-12
+
+### Add Hard Constraint: Doc Updates Belong in the Same Commit
+
+- Add a hard constraint to `SKILL.md`: when generating or updating `AGENTS.md`, always include a local rule naming the canonical docs and what triggers an update - if a change touches user-facing behavior, a public interface, or anything already documented, the doc update goes in the same commit.
+
 ## 2026-06-05
 
 ### Mark Codex Review as Private-Repo-Only
