@@ -82,6 +82,7 @@ After the first setup, the target repo's own docs, checks, and conventions shoul
 - Promote repeated human judgment downward over time: docs, then scripts/tests, then lints when warranted.
 - When the right action is "do nothing yet", say so explicitly.
 - When implementing an update, prefer exactly one justified next step unless the user explicitly asks for a broader sweep.
+- When initializing or updating `AGENTS.md` for a repo that has user-facing CLI commands, documented workflows, or a public API: include an explicit local rule requiring doc updates whenever commands, options, or workflows change. The rule should say what to update and when - not just "keep docs fresh". This encodes the maintenance loop from the principles into the repo before the first drift happens.
 
 ## Standard workflow
 
