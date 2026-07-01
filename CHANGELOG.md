@@ -6,6 +6,15 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-07-01
+
+### Split Local Code Review From Bot Installation
+
+- Rename the GitHub Action installer skill from `codex-review` to `install-code-review-bot`.
+- Add `code-review`, a local Codex review skill that reuses the bot's prompt and output schema,
+  builds `.codex-ci/` artifacts, keeps local continuity state under `.git/codex-review/`, and prints
+  the Markdown review instead of posting GitHub comments.
+
 ## 2026-06-12
 
 ### Add Hard Constraint: Doc Updates Belong in the Same Commit

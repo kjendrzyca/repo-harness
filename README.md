@@ -42,9 +42,14 @@ The ExecPlan template in [`skills/repo-harness/assets/exec-plans/create-plan-fil
 
 ## Extras
 
-- [`codex-review`](skills/codex-review/SKILL.md) - private-repository-only skill that installs,
-  authenticates, and rotates the Codex CLI PR review bot on a repo. Do not install it in public
-  repositories. Install: `npx skills add github.com/kjendrzyca/repo-harness --skill codex-review`.
+- [`code-review`](skills/code-review/SKILL.md) - local Codex PR review skill. It runs the same
+  prompt and schema as the review bot from a checked-out repository, writes `.codex-ci/` artifacts,
+  stores local continuity state, and prints the Markdown verdict. Install:
+  `npx skills add github.com/kjendrzyca/repo-harness --skill code-review`.
+- [`install-code-review-bot`](skills/install-code-review-bot/SKILL.md) - private-repository-only
+  skill that installs, authenticates, and rotates the Codex CLI PR review bot on a repo. Do not
+  install it in public repositories. Install:
+  `npx skills add github.com/kjendrzyca/repo-harness --skill install-code-review-bot`.
 
 ## Contributing
 

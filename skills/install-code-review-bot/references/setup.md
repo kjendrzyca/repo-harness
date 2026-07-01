@@ -1,9 +1,9 @@
-# Codex Review Bot — reference
+# Codex Review Bot - reference
 
-Background and configuration for the GitHub Actions review bot that the `codex-review` skill
-installs and authenticates. The bot is a lightweight PR review workflow powered by the Codex CLI;
-the skill (see `../SKILL.md`) drives install, auth, and rotation, so this file is reference material:
-what the workflow does, how to configure it, cost control, and security.
+Background and configuration for the GitHub Actions review bot that the `install-code-review-bot`
+skill installs and authenticates. The bot is a lightweight PR review workflow powered by the Codex
+CLI; the skill (see `../SKILL.md`) drives install, auth, and rotation, so this file is reference
+material: what the workflow does, how to configure it, cost control, and security.
 
 > [!WARNING]
 > This bot is intended for private repositories only. Do not install it in public repositories.
@@ -37,7 +37,7 @@ The skill carries the bot under `assets/bundle/.github/`, in the same layout it 
 The skill performs these steps (see `../SKILL.md`); paths below are relative to the skill root:
 
 1. **Install the bundle:** `scripts/install-workflow.sh --repo-dir <target>` copies the `.github/`
-   files above into the target repo. Commit them to the repo's **default branch** —
+   files above into the target repo. Commit them to the repo's **default branch** -
    `pull_request_target` reads the workflow and scripts from the base branch, so it only takes effect
    once committed there.
 
