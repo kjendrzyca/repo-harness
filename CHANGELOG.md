@@ -6,6 +6,37 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-07-04
+
+### Harden Local Code Review Eval Safety
+
+- Validate `local-code-review` eval run IDs before creating or recursively replacing a workspace, so
+  `--run-id` cannot escape `evals/local-code-review/workspaces/`.
+- Update the legacy bot-parity runner's mutation guard to compare raw Git diffs instead of only
+  filename/status output.
+
+### Rename Local Code Review Skill
+
+- Rename the local review skill from `code-review` to `local-code-review` so it is clearly distinct
+  from the `install-code-review-bot` GitHub Action installer.
+- Update the README install command, local eval harness path, and skill metadata for the new public
+  install target: `npx skills add github.com/kjendrzyca/repo-harness --skill local-code-review`.
+
+## 2026-07-03
+
+### Add Eval-Driven Local Code Review Runner
+
+- Add a lighter local `local-code-review` runner that keeps the repo-harness review prompt and structured
+  continuity state while avoiding `.codex-ci/` diff artifacts in the reviewed repository.
+- Store scope-keyed local review continuity under Git's private `codex-review` path by default, and
+  fail if the review run changes the checkout/worktree or if the mutation guard cannot collect a
+  complete Git inventory within its output limits.
+- Require a clean worktree for branch and commit reviews, and require commit reviews to run from a
+  checkout whose `HEAD` is the reviewed commit. Use the uncommitted scope when local changes are
+  intended.
+- Add a local-code-review eval harness that compares the legacy bot-parity runner with the local runner on
+  an omission-detection and resolved-issue continuity fixture.
+
 ## 2026-07-01
 
 ### Split Local Code Review From Bot Installation

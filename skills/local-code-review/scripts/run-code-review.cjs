@@ -163,6 +163,11 @@ function gitText(repoRoot, args, options = {}) {
   return (result.stdout || '').trim()
 }
 
+function gitRaw(repoRoot, args, options = {}) {
+  const result = git(repoRoot, args, options)
+  return result.stdout || ''
+}
+
 function gitCommitExists(repoRoot, rev) {
   return git(repoRoot, ['cat-file', '-e', `${rev}^{commit}`], { allowFailure: true }).status === 0
 }
@@ -241,10 +246,10 @@ function buildPrompt(vars) {
 }
 
 function trackedDiffSignature(repoRoot) {
-  const unstaged = gitText(repoRoot, ['diff', '--name-status', '--', ':!.codex-ci'], {
+  const unstaged = gitRaw(repoRoot, ['diff', '--binary', '--no-ext-diff', '--', ':!.codex-ci'], {
     allowFailure: true,
   })
-  const staged = gitText(repoRoot, ['diff', '--cached', '--name-status', '--', ':!.codex-ci'], {
+  const staged = gitRaw(repoRoot, ['diff', '--cached', '--binary', '--no-ext-diff', '--', ':!.codex-ci'], {
     allowFailure: true,
   })
   return `${unstaged}\n--cached--\n${staged}`

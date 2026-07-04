@@ -1,0 +1,25 @@
+{
+  "skill_name": "local-code-review",
+  "evals": [
+    {
+      "id": "tenant-reset-omission-continuity",
+      "description": "A branch adds tenant billing credits but forgets to clear them in the tenant reset path, then a later commit fixes the omission. The review must find the omission on pass 1 and mark it resolved on pass 2 without duplicating it.",
+      "expected_findings": [
+        {
+          "id": "tenant-reset-billing-credits",
+          "severity": "P1",
+          "category": "Correctness",
+          "file": "src/tenantStore.js",
+          "failure_scenario": "A tenant reset leaves billingCredits behind, so the next lifecycle/test run sees stale credit balance from the previous state."
+        }
+      ],
+      "assertions": [
+        "Pass 1 identifies that resetTenant fails to clear billingCredits.",
+        "Pass 1 includes a concrete failure scenario.",
+        "Pass 1 writes at least one open issue to continuity state.",
+        "Pass 2 marks the previous billingCredits issue as resolved after the fix commit.",
+        "Pass 2 does not keep the fixed billingCredits issue open."
+      ]
+    }
+  ]
+}

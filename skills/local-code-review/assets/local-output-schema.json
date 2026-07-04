@@ -1,0 +1,78 @@
+{
+  "type": "object",
+  "properties": {
+    "review_markdown": {
+      "type": "string",
+      "description": "The full local code review in markdown format"
+    },
+    "state": {
+      "type": "object",
+      "description": "Machine-readable local review state for continuity across runs",
+      "properties": {
+        "schema_version": { "type": "integer" },
+        "last_reviewed_head_sha": { "type": "string" },
+        "scope_key": { "type": "string" },
+        "review_count": { "type": "integer" },
+        "updated_at": { "type": "string" },
+        "open_issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+              "category": { "type": "string" },
+              "title": { "type": "string" },
+              "file": { "type": "string" },
+              "line_range": { "type": "string" },
+              "failure_scenario": { "type": "string" },
+              "suggested_fix": { "type": "string" },
+              "status": { "type": "string", "enum": ["open"] },
+              "first_seen_head_sha": { "type": "string" },
+              "last_seen_head_sha": { "type": "string" }
+            },
+            "required": [
+              "id",
+              "severity",
+              "category",
+              "title",
+              "file",
+              "line_range",
+              "failure_scenario",
+              "suggested_fix",
+              "status",
+              "first_seen_head_sha",
+              "last_seen_head_sha"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "recently_resolved_issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "resolved_in_head_sha": { "type": "string" },
+              "resolution": { "type": "string" }
+            },
+            "required": ["id", "resolved_in_head_sha", "resolution"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "last_reviewed_head_sha",
+        "scope_key",
+        "review_count",
+        "updated_at",
+        "open_issues",
+        "recently_resolved_issues"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": ["review_markdown", "state"],
+  "additionalProperties": false
+}
