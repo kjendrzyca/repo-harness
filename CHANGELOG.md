@@ -6,6 +6,20 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-07-10
+
+### Warn Against Modifying the Repository During a Local Review Run
+
+- Add a "Do not touch the target repository during a run" rule to the `local-code-review` skill:
+  while `run-local-review.cjs` is running, invoking agents must not edit sources, run
+  tests/builds/lints that write artifacts, perform git operations, or start dev servers writing into
+  the repo, because the mutation guard diffs the worktree before/after and treats any change as a
+  failed integrity check. Parallel work belongs in a separate `git worktree`.
+- Print a one-line stderr notice when the review starts ("Review in progress - do not modify the
+  repository until this process exits").
+- Motivation: concurrent worktree mutations were tripping the mutation guard and invalidating
+  otherwise good reviews.
+
 ## 2026-07-04
 
 ### Harden Local Code Review Eval Safety

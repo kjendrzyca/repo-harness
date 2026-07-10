@@ -601,6 +601,7 @@ function main() {
 
   const beforeSignature = worktreeMutationSignature(repoRoot)
   const started = Date.now()
+  console.error('[local-code-review] Review in progress - do not modify the repository until this process exits')
   const codexResult = run('codex', codexArgs, {
     cwd: repoRoot,
     input: prompt,

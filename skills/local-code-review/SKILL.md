@@ -34,6 +34,22 @@ The default run disables network and stores continuity under Git's private `code
 4. Read the Markdown review printed by the script. The same text and structured continuity state are
    saved under the checkout's Git-private `codex-review` path.
 
+## Do not touch the target repository during a run
+
+While `run-local-review.cjs` is running, do not modify the target repository at all until the
+runner's output is received:
+
+- no source edits
+- no test, build, or lint runs (they write artifacts like `test-results/`, `dist/`, or coverage)
+- no git operations (commit, checkout, stash, branch)
+- no dev servers or other processes writing into the repo
+- nothing else that mutates the worktree or moves refs
+
+The runner's mutation guard diffs the worktree before and after the run and treats any change as a
+failed integrity check, so concurrent activity turns a good review into an error. Wait for the run
+to finish (it is typically run in the background). If parallel work is genuinely needed, run the
+review against a separate `git worktree` copy of the repository instead.
+
 ## Available script
 
 - `scripts/run-local-review.cjs` - runs Codex with the local review prompt, a structured output
