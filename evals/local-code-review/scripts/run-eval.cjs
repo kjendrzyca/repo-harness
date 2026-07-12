@@ -19,7 +19,7 @@ Run local-code-review eval fixtures against the legacy bot-parity runner and/or 
 
 Options:
   --runner NAME      Runner to evaluate: legacy, local, all (default: all)
-  --model MODEL      Codex review model (default: CODEX_MODEL or gpt-5.5)
+  --model MODEL      Codex review model (default: CODEX_MODEL or gpt-5.6-sol)
   --reasoning LEVEL  Reasoning effort config (default: CODEX_REASONING or xhigh)
   --run-id ID        Workspace run id safe slug (default: timestamp)
   --no-codex         Build prompts/artifacts without model calls
@@ -28,7 +28,7 @@ Options:
 
 Examples:
   node evals/local-code-review/scripts/run-eval.cjs --runner all
-  node evals/local-code-review/scripts/run-eval.cjs --runner local --model gpt-5.5
+  node evals/local-code-review/scripts/run-eval.cjs --runner local --model gpt-5.6-sol
   node evals/local-code-review/scripts/run-eval.cjs --runner all --no-codex
 `
 }
@@ -41,7 +41,7 @@ function fail(message, code = 1) {
 function parseArgs(argv) {
   const opts = {
     runner: 'all',
-    model: process.env.CODEX_MODEL || 'gpt-5.5',
+    model: process.env.CODEX_MODEL || 'gpt-5.6-sol',
     reasoning: process.env.CODEX_REASONING || 'xhigh',
     runId: new Date().toISOString().replace(/[:.]/g, '-'),
     noCodex: false,

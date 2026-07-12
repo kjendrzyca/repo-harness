@@ -6,6 +6,13 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-07-12
+
+### Update the Default Local Review Model
+
+- Change the `local-code-review` runner, legacy comparison runner, and eval harness default from
+  `gpt-5.5` to `gpt-5.6-sol`, keeping `xhigh` reasoning as the default.
+
 ## 2026-07-10
 
 ### Warn Against Modifying the Repository During a Local Review Run

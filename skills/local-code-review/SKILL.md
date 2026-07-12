@@ -66,7 +66,7 @@ node scripts/run-local-review.cjs --repo-dir <target-repo> --commit HEAD --title
 node scripts/run-local-review.cjs --repo-dir <target-repo> --base origin/main --reset
 node scripts/run-local-review.cjs --repo-dir <target-repo> --base origin/main --force
 node scripts/run-local-review.cjs --repo-dir <target-repo> --base origin/main --no-codex
-node scripts/run-local-review.cjs --repo-dir <target-repo> --base origin/main --model gpt-5.5 --reasoning xhigh
+node scripts/run-local-review.cjs --repo-dir <target-repo> --base origin/main --model gpt-5.6-sol --reasoning xhigh
 ```
 
 Use `--no-codex` to build and inspect the prompt/schema without spending a model run.
