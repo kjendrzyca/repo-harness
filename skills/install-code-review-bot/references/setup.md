@@ -50,11 +50,15 @@ The skill performs these steps (see `../SKILL.md`); paths below are relative to 
 3. Review the workflow defaults in `.github/workflows/codex-review.yml`:
 
    ```yaml
-   CODEX_MODEL: gpt-5.5
-   CODEX_REASONING: xhigh
+   CODEX_MODEL: gpt-5.6-sol
+   CODEX_REASONING: high
    CODEX_SANDBOX_MODE: workspace-write
    CODEX_WEB_SEARCH_MODE: disabled
    ```
+
+   The bundled workflow pins `@openai/codex@0.144.3`. The `0.144.x` stable release line is the
+   first one that bundles model metadata for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`.
+   Keep the CLI pin on `0.144.3` or a newer explicitly tested version when using these models.
 
 4. Optionally customize the `pull_request_target.paths` filter in the workflow.
 
@@ -68,7 +72,7 @@ The skill performs these steps (see `../SKILL.md`); paths below are relative to 
 ## Cost Control
 
 > [!WARNING]
-> This bot uses a strong Codex model by default (`gpt-5.5` with `xhigh` reasoning). That can make it more useful than lightweight review bots, but it can also make it pricey if it runs on every push.
+> This bot uses a strong Codex model by default (`gpt-5.6-sol` with `high` reasoning). That can make it more useful than lightweight review bots, but it can also make it pricey if it runs on every push.
 >
 > For cost-sensitive repositories, consider disabling automatic `pull_request_target` runs and triggering the review only on demand with a PR comment:
 >

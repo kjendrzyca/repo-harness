@@ -6,6 +6,19 @@ Entries are grouped by ISO 8601 dates (`YYYY-MM-DD`). This repository does not m
 
 Within each date, every change should get its own `### <Change title>` section. Add new sections above older sections for the same day. This keeps diffs clean and avoids growing one large mixed list.
 
+## 2026-07-13
+
+### Update the Bundled Review Bot Model and Codex CLI
+
+- Change the bundled GitHub Action review bot default to `gpt-5.6-sol` with `high` reasoning.
+- Pin `@openai/codex@0.144.3`, from the first stable release line that bundles
+  `gpt-5.6-sol` model metadata.
+
+### Lower the Default Local Review Reasoning Effort
+
+- Change the `local-code-review` runner, legacy comparison runner, and eval harness default reasoning
+  effort from `xhigh` to `high`. The default model remains `gpt-5.6-sol`.
+
 ## 2026-07-12
 
 ### Update the Default Local Review Model

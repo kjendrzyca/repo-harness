@@ -27,7 +27,7 @@ Options:
   --pr-number VALUE     PR number shown in the prompt (default: local)
   --pr-body-file FILE   Markdown/text file used as the PR description
   --model MODEL         Codex model (default: CODEX_MODEL or gpt-5.6-sol)
-  --reasoning EFFORT    Reasoning effort (default: CODEX_REASONING or xhigh)
+  --reasoning EFFORT    Reasoning effort (default: CODEX_REASONING or high)
   --sandbox MODE        Codex sandbox mode (default: CODEX_SANDBOX_MODE or workspace-write)
   --web-search MODE     Codex web search mode (default: CODEX_WEB_SEARCH_MODE or disabled)
   --no-codex            Build artifacts and prompt, but do not run Codex
@@ -57,7 +57,7 @@ function parseArgs(argv) {
     prNumber: 'local',
     prBodyFile: '',
     model: process.env.CODEX_MODEL || 'gpt-5.6-sol',
-    reasoning: process.env.CODEX_REASONING || 'xhigh',
+    reasoning: process.env.CODEX_REASONING || 'high',
     sandbox: process.env.CODEX_SANDBOX_MODE || 'workspace-write',
     webSearch: process.env.CODEX_WEB_SEARCH_MODE || 'disabled',
     noCodex: false,

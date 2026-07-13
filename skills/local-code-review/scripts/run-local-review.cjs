@@ -37,7 +37,7 @@ Options:
   --pr-body-file FILE   Markdown/text file used as extra review context
   --ledger-dir DIR      Store prompt/output/state here (default: git private codex-review path)
   --model MODEL         Codex model (default: CODEX_MODEL or gpt-5.6-sol)
-  --reasoning EFFORT    Reasoning effort config (default: CODEX_REASONING or xhigh)
+  --reasoning EFFORT    Reasoning effort config (default: CODEX_REASONING or high)
   --sandbox MODE        Codex sandbox_mode config (default: CODEX_SANDBOX_MODE or workspace-write)
   --web-search MODE     Codex web_search config (default: CODEX_WEB_SEARCH_MODE or disabled)
   --no-codex            Build prompt and copy schema, but do not run Codex
@@ -68,7 +68,7 @@ function parseArgs(argv) {
     prBodyFile: '',
     ledgerDir: '',
     model: process.env.CODEX_MODEL || 'gpt-5.6-sol',
-    reasoning: process.env.CODEX_REASONING || 'xhigh',
+    reasoning: process.env.CODEX_REASONING || 'high',
     sandbox: process.env.CODEX_SANDBOX_MODE || 'workspace-write',
     webSearch: process.env.CODEX_WEB_SEARCH_MODE || 'disabled',
     noCodex: false,

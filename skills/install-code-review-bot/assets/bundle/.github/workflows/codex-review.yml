@@ -87,8 +87,8 @@ jobs:
 
     env:
       # ── Customize: model, sandbox, and reasoning ──
-      CODEX_MODEL: gpt-5.5
-      CODEX_REASONING: xhigh
+      CODEX_MODEL: gpt-5.6-sol
+      CODEX_REASONING: high
       CODEX_SANDBOX_MODE: workspace-write    # workspace-write | read-only
       CODEX_WEB_SEARCH_MODE: disabled        # disabled | cached | live
 
@@ -383,9 +383,11 @@ jobs:
           node-version: '22'
 
       - name: Install Codex CLI
-        # Pinned: unpinned `latest` once shipped a `codex sandbox` CLI change that broke the probe below.
+        # Pinned: 0.144.x is the first stable line with bundled gpt-5.6-sol model metadata.
+        # Keep an exact version because unpinned `latest` once shipped a `codex sandbox` CLI change
+        # that broke the probe below.
         if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
-        run: npm install -g @openai/codex@0.135.0
+        run: npm install -g @openai/codex@0.144.3
 
       - name: Restore Codex auth
         if: steps.skip.outputs.skip != 'true' && steps.scope.outputs.review_mode != 'skip'
